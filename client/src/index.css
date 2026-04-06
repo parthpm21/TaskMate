@@ -1,0 +1,65 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #0a0a0a;
+  --surface: #111111;
+  --card: #161616;
+  --border: #222222;
+  --accent: #f5a623;
+  --accent2: #ff6b35;
+  --green: #22c55e;
+  --text: #f0ece4;
+  --muted: #888;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+
+/* Animations */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.7); }
+}
+
+.animate-fadeUp   { animation: fadeUp 0.5s ease both; }
+.animate-fadeIn   { animation: fadeIn 0.3s ease both; }
+.pulse-dot        { animation: pulse-dot 1.5s ease-in-out infinite; }
+
+/* Category pill colours */
+.pill-delivery { background: rgba(34,197,94,0.15);  color: #22c55e; }
+.pill-academic { background: rgba(99,102,241,0.15); color: #818cf8; }
+.pill-tech     { background: rgba(245,166,35,0.15); color: #f5a623; }
+.pill-household{ background: rgba(255,107,53,0.15); color: #ff6b35; }
+.pill-tutoring { background: rgba(236,72,153,0.15); color: #f472b6; }
+.pill-transport{ background: rgba(14,165,233,0.15); color: #38bdf8; }
+.pill-events   { background: rgba(168,85,247,0.15); color: #c084fc; }
+.pill-personal { background: rgba(251,191,36,0.15); color: #fbbf24; }
+.pill-other    { background: rgba(156,163,175,0.15);color: #9ca3af; }
+
+.status-open        { background: rgba(34,197,94,0.15);  color: #22c55e; }
+.status-assigned    { background: rgba(245,166,35,0.15); color: #f5a623; }
+.status-in_progress { background: rgba(14,165,233,0.15); color: #38bdf8; }
+.status-completed   { background: rgba(99,102,241,0.15); color: #818cf8; }
+.status-disputed    { background: rgba(239,68,68,0.15);  color: #f87171; }
+.status-cancelled   { background: rgba(156,163,175,0.15);color: #9ca3af; }
