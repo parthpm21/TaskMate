@@ -9,7 +9,8 @@ export const SocketProvider = ({ children }) => {
   const socketRef = useRef(null);
 
   useEffect(() => {
-    socketRef.current = io(window.location.origin, { autoConnect: false });
+    const SOCKET_URL = import.meta.env.VITE_API_URL || window.location.origin;
+    socketRef.current = io(SOCKET_URL, { autoConnect: false });
     socketRef.current.connect();
 
     if (user) {
