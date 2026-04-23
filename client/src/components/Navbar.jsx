@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth as useClerkAuth, UserButton, SignInButton } from '@clerk/clerk-react';
 import { useAuth } from '../context/AuthContext';
+import { motion } from 'framer-motion';
 
 export default function Navbar() {
   const { isSignedIn } = useClerkAuth();
@@ -12,11 +13,11 @@ export default function Navbar() {
   const isActive = (path) => location.pathname === path;
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-[rgba(10,10,10,0.9)] backdrop-blur-md border-b border-[#222]">
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-[#0a0a0a]/70 backdrop-blur-xl border-b border-white/5 shadow-2xl">
       <div className="max-w-6xl mx-auto px-6 flex items-center justify-between h-16">
         {/* Logo */}
-        <Link to="/" className="font-head font-extrabold text-xl tracking-tight">
-          Task<span className="text-accent">Mate</span>
+        <Link to="/" className="font-head font-extrabold text-xl tracking-tight group">
+          Task<span className="gradient-text">Mate</span>
         </Link>
 
         {/* Desktop nav */}
@@ -35,21 +36,25 @@ export default function Navbar() {
         <div className="hidden md:flex items-center gap-3">
           {isSignedIn ? (
             <>
-              <Link
-                to="/post"
-                className="bg-accent text-black text-sm font-bold px-4 py-2 rounded-lg hover:opacity-90 transition-opacity"
-              >
-                + Post Task
-              </Link>
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.96 }}>
+                <Link
+                  to="/post"
+                  className="glow-accent bg-accent text-black text-sm font-bold px-4 py-2 rounded-lg hover:opacity-95 transition-all"
+                >
+                  + Post Task
+                </Link>
+              </motion.div>
 
               {/* Profile link — uses MongoDB _id */}
               {user && (
-                <Link
-                  to={`/profile/${user._id}`}
-                  className="text-sm text-[#888] hover:text-white transition-colors px-3 py-2 border border-[#222] rounded-lg hover:border-accent"
-                >
-                  My Profile
-                </Link>
+                <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}>
+                  <Link
+                    to={`/profile/${user._id}`}
+                    className="text-sm text-[#888] hover:text-white transition-colors px-3 py-2 border border-[#222] rounded-lg hover:border-accent"
+                  >
+                    My Profile
+                  </Link>
+                </motion.div>
               )}
 
               {/* Clerk's built-in avatar + sign-out dropdown */}
@@ -67,18 +72,22 @@ export default function Navbar() {
             </>
           ) : (
             <>
-              <Link
-                to="/login"
-                className="text-sm text-[#888] hover:text-white transition-colors px-4 py-2 border border-[#222] rounded-lg hover:border-accent"
-              >
-                Log in
-              </Link>
-              <Link
-                to="/register"
-                className="bg-accent text-black text-sm font-bold px-4 py-2 rounded-lg hover:opacity-90 transition-opacity"
-              >
-                Get Started
-              </Link>
+              <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}>
+                <Link
+                  to="/login"
+                  className="text-sm text-[#888] hover:text-white transition-colors px-4 py-2 border border-[#222] rounded-lg hover:border-accent"
+                >
+                  Log in
+                </Link>
+              </motion.div>
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.96 }}>
+                <Link
+                  to="/register"
+                  className="glow-accent bg-accent text-black text-sm font-bold px-4 py-2 rounded-lg hover:opacity-95 transition-all"
+                >
+                  Get Started
+                </Link>
+              </motion.div>
             </>
           )}
         </div>

@@ -11,8 +11,8 @@ export default {
         border: '#222222',
       },
       fontFamily: {
-        sans: ['DM Sans', 'sans-serif'],
-        head: ['Syne', 'sans-serif'],
+        sans: ['Inter', 'sans-serif'],
+        head: ['Outfit', 'sans-serif'],
       },
     },
   },

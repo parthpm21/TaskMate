@@ -4,6 +4,8 @@ import api from '../utils/api';
 import TaskCard from '../components/TaskCard';
 import toast from 'react-hot-toast';
 import { useSocket } from '../context/SocketContext';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Search } from 'lucide-react';
 
 const CATEGORIES = ['all', 'delivery', 'academic', 'tech', 'household', 'tutoring', 'transport', 'events', 'personal', 'other'];
 const SORTS = [
@@ -78,7 +80,7 @@ export default function Browse() {
         {/* Search + Sort */}
         <div className="flex flex-col sm:flex-row gap-3 mb-6">
           <div className="relative flex-1">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#444]">🔍</span>
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#444] w-5 h-5" />
             <input
               type="text"
               value={searchInput}
@@ -131,15 +133,30 @@ export default function Browse() {
             ))}
           </div>
         ) : tasks.length === 0 ? (
-          <div className="text-center py-24">
-            <div className="text-5xl mb-4">🔍</div>
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+            className="text-center py-24"
+          >
+            <Search className="w-12 h-12 text-[#444] mx-auto mb-4" />
             <h3 className="font-head font-bold text-xl mb-2">No tasks found</h3>
             <p className="text-[#555] text-sm">Try changing filters or be the first to post one!</p>
-          </div>
+          </motion.div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {tasks.map(task => <TaskCard key={task._id} task={task} />)}
-          </div>
+          <motion.div 
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"
+          >
+            <AnimatePresence>
+              {tasks.map((task, index) => (
+                <motion.div
+                  key={task._id}
+                  initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9 }} transition={{ delay: index * 0.05 }}
+                  layout
+                >
+                  <TaskCard task={task} />
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </motion.div>
         )}
 
         {/* Pagination */}
