@@ -4,6 +4,8 @@ import { formatDistanceToNow, format } from 'date-fns';
 import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
+import PayButton from '../components/PayButton';
+import ReleaseButton from '../components/ReleaseButton';
 
 const STATUS_LABELS = {
   open: 'Open', assigned: 'Assigned', in_progress: 'In Progress',
@@ -28,7 +30,17 @@ export default function TaskDetail() {
   useEffect(() => {
     Promise.all([
       api.get(`/tasks/${id}`),
-      user && api.get(`/bids/task/${id}`).catch(() => ({ data: { bids: [] } })),
+      user 
+        ? api.get(`/bids/task/${id}`).catch((err) => {
+            // If 403, we are not the poster. Fetch just our own bid instead.
+            if (err.response?.status === 403) {
+              return api.get(`/bids/my/${id}`)
+                .then(res => ({ data: { bids: res.data.bid ? [res.data.bid] : [] } }))
+                .catch(() => ({ data: { bids: [] } }));
+            }
+            return { data: { bids: [] } };
+          })
+        : Promise.resolve(null),
     ]).then(([taskRes, bidsRes]) => {
       setTask(taskRes.data.task);
       if (bidsRes) setBids(bidsRes.data.bids);
@@ -74,15 +86,18 @@ export default function TaskDetail() {
     }
   };
 
+  const [starting, setStarting] = useState(false);
+
   const startTask = async () => {
-    const myAcceptedBid = bids.find(b => b.bidder?._id === user?._id && b.status === 'accepted');
-    if (!myAcceptedBid) return;
+    setStarting(true);
     try {
-      await api.put(`/bids/${myAcceptedBid._id}/start`);
-      setTask(t => ({ ...t, status: 'in_progress' }));
-      toast.success('Task started!');
+      const { data } = await api.put(`/bids/start-by-task/${id}`);
+      setTask(data.task);
+      toast.success('🚀 Task started! Go get it done.');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed');
+      toast.error(err.response?.data?.message || 'Failed to start task');
+    } finally {
+      setStarting(false);
     }
   };
 
@@ -205,16 +220,62 @@ export default function TaskDetail() {
               </div>
             )}
 
+            {/* Poster pays into escrow after assigning a bid */}
+            {isPoster && task.status === 'assigned' && task.paymentStatus === 'unpaid' && (
+              <PayButton
+                task={task}
+                onPaid={(updatedTask) => setTask(updatedTask)}
+              />
+            )}
+
+            {/* Escrow held — inform poster payment is locked in */}
+            {isPoster && task.status === 'assigned' && task.paymentStatus === 'held' && (
+              <div className="bg-green-500/10 border border-green-500/25 rounded-2xl p-4 flex items-center gap-3">
+                <span className="text-2xl">🔒</span>
+                <div>
+                  <div className="text-sm font-bold text-green-400">Payment held in escrow</div>
+                  <div className="text-xs text-[#666] mt-0.5">₹{task.finalAmount?.toLocaleString('en-IN')} will be released to the tasker once the task is complete.</div>
+                </div>
+              </div>
+            )}
+
+            {/* Tasker starts the task */}
             {isAssigned && task.status === 'assigned' && (
-              <button onClick={startTask} className="w-full bg-blue-500 text-white font-bold py-4 rounded-xl hover:bg-blue-600 transition-colors">
-                Start Task
+              <button
+                onClick={startTask}
+                disabled={starting}
+                className="w-full bg-blue-500 text-white font-bold py-4 rounded-xl hover:bg-blue-600 disabled:opacity-60 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+              >
+                {starting ? (
+                  <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Starting...</>
+                ) : '🚀 Start Task'}
               </button>
             )}
 
+            {/* Mark complete */}
             {(isPoster || isAssigned) && task.status === 'in_progress' && (
               <button onClick={markComplete} className="w-full bg-green-500 text-white font-bold py-4 rounded-xl hover:bg-green-600 transition-colors">
-                Mark as Complete
+                ✅ Mark as Complete
               </button>
+            )}
+
+            {/* Poster releases escrow after task is completed */}
+            {isPoster && task.status === 'completed' && task.paymentStatus === 'held' && (
+              <ReleaseButton
+                task={task}
+                onReleased={(updatedTask) => setTask(updatedTask)}
+              />
+            )}
+
+            {/* Show released state */}
+            {task.status === 'completed' && task.paymentStatus === 'released' && (
+              <div className="bg-accent/10 border border-accent/25 rounded-2xl p-4 flex items-center gap-3">
+                <span className="text-2xl">🎉</span>
+                <div>
+                  <div className="text-sm font-bold text-accent">Task complete & payment released!</div>
+                  <div className="text-xs text-[#666] mt-0.5">₹{task.finalAmount?.toLocaleString('en-IN')} has been sent to the tasker.</div>
+                </div>
+              </div>
             )}
 
             {(isPoster || isAssigned) && ['assigned', 'in_progress'].includes(task.status) && (

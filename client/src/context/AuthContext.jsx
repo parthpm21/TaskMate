@@ -1,55 +1,47 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import { useUser, useAuth as useClerkAuth } from '@clerk/clerk-react';
+import { setTokenGetter } from '../utils/tokenStore';
 import api from '../utils/api';
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('tm_user')); } catch { return null; }
-  });
+  const { user: clerkUser, isLoaded: clerkLoaded } = useUser();
+  const { getToken } = useClerkAuth();
+
+  // MongoDB user profile
+  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Register Clerk's getToken so api.js can attach it to requests
   useEffect(() => {
-    const token = localStorage.getItem('tm_token');
-    if (token) {
-      api.get('/auth/me')
-        .then(({ data }) => setUser(data.user))
-        .catch(() => { localStorage.removeItem('tm_token'); localStorage.removeItem('tm_user'); })
-        .finally(() => setLoading(false));
-    } else {
+    setTokenGetter(getToken);
+  }, [getToken]);
+
+  // When Clerk's auth state changes, sync the MongoDB profile
+  useEffect(() => {
+    if (!clerkLoaded) return;
+
+    if (!clerkUser) {
+      // Signed out
+      setUser(null);
       setLoading(false);
+      return;
     }
-  }, []);
 
-  const login = async (email, password) => {
-    const { data } = await api.post('/auth/login', { email, password });
-    localStorage.setItem('tm_token', data.token);
-    localStorage.setItem('tm_user', JSON.stringify(data.user));
-    setUser(data.user);
-    return data.user;
-  };
+    // Signed in — fetch (or lazy-create) the MongoDB profile
+    setLoading(true);
+    api.get('/auth/me')
+      .then(({ data }) => setUser(data.user))
+      .catch(() => setUser(null))
+      .finally(() => setLoading(false));
+  }, [clerkUser, clerkLoaded]);
 
-  const register = async (name, email, password) => {
-    const { data } = await api.post('/auth/register', { name, email, password });
-    localStorage.setItem('tm_token', data.token);
-    localStorage.setItem('tm_user', JSON.stringify(data.user));
-    setUser(data.user);
-    return data.user;
-  };
-
-  const logout = () => {
-    localStorage.removeItem('tm_token');
-    localStorage.removeItem('tm_user');
-    setUser(null);
-  };
-
-  const updateUser = (updated) => {
-    setUser(updated);
-    localStorage.setItem('tm_user', JSON.stringify(updated));
-  };
+  // Allow components to update the cached MongoDB profile (e.g. after profile edit)
+  const updateUser = (updated) => setUser(updated);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, loading, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

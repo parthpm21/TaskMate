@@ -131,11 +131,20 @@ export default function PostTask() {
               <button
                 type="button"
                 onClick={() => setLocation('isRemote', !form.location.isRemote)}
-                className={`relative w-11 h-6 rounded-full transition-colors ${form.location.isRemote ? 'bg-accent' : 'bg-[#333]'}`}
+                aria-pressed={form.location.isRemote}
+                className={`relative flex-shrink-0 w-12 h-7 rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-accent/50 ${
+                  form.location.isRemote ? 'bg-accent' : 'bg-[#3a3a3a] border border-[#555]'
+                }`}
               >
-                <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-transform ${form.location.isRemote ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                <span
+                  className={`absolute top-1/2 -translate-y-1/2 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-200 ${
+                    form.location.isRemote ? 'left-[calc(100%-1.4rem)]' : 'left-1'
+                  }`}
+                />
               </button>
-              <span className="text-sm text-[#888]">Remote / Online task</span>
+              <span className={`text-sm font-medium transition-colors duration-200 ${
+                form.location.isRemote ? 'text-accent' : 'text-[#888]'
+              }`}>Remote / Online task</span>
             </div>
             {!form.location.isRemote && (
               <input
@@ -157,9 +166,16 @@ export default function PostTask() {
             <button
               type="button"
               onClick={() => set('isUrgent', !form.isUrgent)}
-              className={`relative w-11 h-6 rounded-full transition-colors ${form.isUrgent ? 'bg-accent' : 'bg-[#333]'}`}
+              aria-pressed={form.isUrgent}
+              className={`relative flex-shrink-0 w-12 h-7 rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-accent/50 ${
+                form.isUrgent ? 'bg-accent' : 'bg-[#3a3a3a] border border-[#555]'
+              }`}
             >
-              <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-transform ${form.isUrgent ? 'translate-x-5' : 'translate-x-0.5'}`} />
+              <span
+                className={`absolute top-1/2 -translate-y-1/2 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-200 ${
+                  form.isUrgent ? 'left-[calc(100%-1.4rem)]' : 'left-1'
+                }`}
+              />
             </button>
           </div>
 

@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  appType: 'spa', // serve index.html as fallback for all paths (required for Clerk routing="path")
   server: {
     proxy: {
       '/api': {

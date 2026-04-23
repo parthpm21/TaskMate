@@ -1,17 +1,13 @@
 import { useState } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
+import { useAuth as useClerkAuth, UserButton, SignInButton } from '@clerk/clerk-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function Navbar() {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
+  const { isSignedIn } = useClerkAuth();
+  const { user } = useAuth(); // MongoDB profile — for _id, name, etc.
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
-
-  const handleLogout = () => {
-    logout();
-    navigate('/');
-  };
 
   const isActive = (path) => location.pathname === path;
 
@@ -28,7 +24,7 @@ export default function Navbar() {
           <Link to="/browse" className={`text-sm font-medium transition-colors ${isActive('/browse') ? 'text-accent' : 'text-[#888] hover:text-white'}`}>
             Browse Tasks
           </Link>
-          {user && (
+          {isSignedIn && (
             <Link to="/dashboard" className={`text-sm font-medium transition-colors ${isActive('/dashboard') ? 'text-accent' : 'text-[#888] hover:text-white'}`}>
               Dashboard
             </Link>
@@ -37,7 +33,7 @@ export default function Navbar() {
 
         {/* Right side */}
         <div className="hidden md:flex items-center gap-3">
-          {user ? (
+          {isSignedIn ? (
             <>
               <Link
                 to="/post"
@@ -45,33 +41,42 @@ export default function Navbar() {
               >
                 + Post Task
               </Link>
-              <div className="relative group">
-                <button className="flex items-center gap-2 bg-[#161616] border border-[#222] rounded-lg px-3 py-2 text-sm hover:border-accent transition-colors">
-                  <div className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center text-accent text-xs font-bold">
-                    {user.name?.[0]?.toUpperCase()}
-                  </div>
-                  <span className="text-[#ccc]">{user.name?.split(' ')[0]}</span>
-                  <span className="text-[#555] text-xs">▾</span>
-                </button>
-                <div className="absolute right-0 top-full mt-2 w-48 bg-[#161616] border border-[#222] rounded-xl overflow-hidden opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none group-hover:pointer-events-auto">
-                  <Link to={`/profile/${user._id}`} className="block px-4 py-3 text-sm text-[#ccc] hover:bg-[#1e1e1e] hover:text-white transition-colors">
-                    My Profile
-                  </Link>
-                  <Link to="/dashboard" className="block px-4 py-3 text-sm text-[#ccc] hover:bg-[#1e1e1e] hover:text-white transition-colors">
-                    Dashboard
-                  </Link>
-                  <button onClick={handleLogout} className="w-full text-left px-4 py-3 text-sm text-red-400 hover:bg-[#1e1e1e] transition-colors border-t border-[#222]">
-                    Log out
-                  </button>
-                </div>
-              </div>
+
+              {/* Profile link — uses MongoDB _id */}
+              {user && (
+                <Link
+                  to={`/profile/${user._id}`}
+                  className="text-sm text-[#888] hover:text-white transition-colors px-3 py-2 border border-[#222] rounded-lg hover:border-accent"
+                >
+                  My Profile
+                </Link>
+              )}
+
+              {/* Clerk's built-in avatar + sign-out dropdown */}
+              <UserButton
+                afterSignOutUrl="/"
+                appearance={{
+                  variables: { colorPrimary: '#f5a623' },
+                  elements: {
+                    avatarBox: 'w-8 h-8 ring-2 ring-accent/30 hover:ring-accent/70 transition-all',
+                    userButtonPopoverCard: 'bg-[#161616] border border-[#222]',
+                    userButtonPopoverActionButton: 'text-[#ccc] hover:bg-[#1e1e1e]',
+                  },
+                }}
+              />
             </>
           ) : (
             <>
-              <Link to="/login" className="text-sm text-[#888] hover:text-white transition-colors px-4 py-2 border border-[#222] rounded-lg hover:border-accent">
+              <Link
+                to="/login"
+                className="text-sm text-[#888] hover:text-white transition-colors px-4 py-2 border border-[#222] rounded-lg hover:border-accent"
+              >
                 Log in
               </Link>
-              <Link to="/register" className="bg-accent text-black text-sm font-bold px-4 py-2 rounded-lg hover:opacity-90 transition-opacity">
+              <Link
+                to="/register"
+                className="bg-accent text-black text-sm font-bold px-4 py-2 rounded-lg hover:opacity-90 transition-opacity"
+              >
                 Get Started
               </Link>
             </>
@@ -92,12 +97,16 @@ export default function Navbar() {
       {menuOpen && (
         <div className="md:hidden bg-[#111] border-t border-[#222] px-6 py-4 flex flex-col gap-4">
           <Link to="/browse" className="text-sm text-[#ccc]" onClick={() => setMenuOpen(false)}>Browse Tasks</Link>
-          {user ? (
+          {isSignedIn ? (
             <>
               <Link to="/post" className="text-sm text-[#ccc]" onClick={() => setMenuOpen(false)}>Post a Task</Link>
               <Link to="/dashboard" className="text-sm text-[#ccc]" onClick={() => setMenuOpen(false)}>Dashboard</Link>
-              <Link to={`/profile/${user._id}`} className="text-sm text-[#ccc]" onClick={() => setMenuOpen(false)}>Profile</Link>
-              <button onClick={() => { handleLogout(); setMenuOpen(false); }} className="text-left text-sm text-red-400">Log out</button>
+              {user && (
+                <Link to={`/profile/${user._id}`} className="text-sm text-[#ccc]" onClick={() => setMenuOpen(false)}>Profile</Link>
+              )}
+              <div className="pt-1 border-t border-[#222]">
+                <UserButton afterSignOutUrl="/" appearance={{ variables: { colorPrimary: '#f5a623' } }} />
+              </div>
             </>
           ) : (
             <>

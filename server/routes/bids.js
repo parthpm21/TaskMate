@@ -23,6 +23,18 @@ router.get('/task/:taskId', protect, async (req, res) => {
   }
 });
 
+// GET /api/bids/my/:taskId — get the current user's own bid for a specific task
+router.get('/my/:taskId', protect, async (req, res) => {
+  try {
+    const bid = await Bid.findOne({ task: req.params.taskId, bidder: req.user._id })
+      .populate('bidder', 'name avatar rating');
+    if (!bid) return res.status(404).json({ message: 'No bid found' });
+    res.json({ bid });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // POST /api/bids — place a bid
 router.post('/', protect, async (req, res) => {
   try {
@@ -104,7 +116,35 @@ router.put('/:id/accept', protect, async (req, res) => {
   }
 });
 
-// PUT /api/bids/:id/start — tasker marks task as in progress
+// PUT /api/bids/start-by-task/:taskId — tasker starts the task they were assigned to
+router.put('/start-by-task/:taskId', protect, async (req, res) => {
+  try {
+    // Find the accepted bid for this task belonging to the requesting user
+    const bid = await Bid.findOne({
+      task: req.params.taskId,
+      bidder: req.user._id,
+      status: 'accepted',
+    });
+    if (!bid) return res.status(404).json({ message: 'No accepted bid found for this task' });
+
+    const task = await Task.findById(bid.task);
+    if (!task) return res.status(404).json({ message: 'Task not found' });
+    if (task.assignedTo?.toString() !== req.user._id.toString())
+      return res.status(403).json({ message: 'Not authorised' });
+    if (task.status !== 'assigned')
+      return res.status(400).json({ message: 'Task must be in assigned state to start' });
+
+    task.status = 'in_progress';
+    await task.save();
+
+    req.io.to(`task:${task._id}`).emit('task:updated', { taskId: task._id, status: 'in_progress' });
+    res.json({ task });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// PUT /api/bids/:id/start — tasker marks task as in progress (by bid ID)
 router.put('/:id/start', protect, async (req, res) => {
   try {
     const bid = await Bid.findById(req.params.id);

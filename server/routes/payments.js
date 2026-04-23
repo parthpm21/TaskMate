@@ -28,6 +28,19 @@ router.post('/create-order', protect, async (req, res) => {
     if (task.status !== 'assigned')
       return res.status(400).json({ message: 'Task must be assigned before payment' });
 
+    // Mock payment flow bypass
+    if (process.env.RAZORPAY_KEY_ID === 'skip') {
+      task.razorpayOrderId = 'mock_order_' + Date.now();
+      task.paymentStatus = 'held';
+      await task.save();
+      return res.json({
+        orderId: task.razorpayOrderId,
+        amount: Math.round(task.finalAmount * 100),
+        currency: 'INR',
+        key: 'skip',
+      });
+    }
+
     const order = await getRazorpay().orders.create({
       amount: Math.round(task.finalAmount * 100), // paise
       currency: 'INR',

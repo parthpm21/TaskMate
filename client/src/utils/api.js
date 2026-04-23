@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getClerkToken } from './tokenStore';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL
@@ -7,8 +8,9 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('tm_token');
+// Attach Clerk's short-lived JWT on every request
+api.interceptors.request.use(async (config) => {
+  const token = await getClerkToken();
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
@@ -16,11 +18,7 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401) {
-      localStorage.removeItem('tm_token');
-      localStorage.removeItem('tm_user');
-      window.location.href = '/login';
-    }
+    // 401 handling — Clerk manages re-auth so we just reject
     return Promise.reject(err);
   }
 );

@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import api from '../utils/api';
 import TaskCard from '../components/TaskCard';
 import toast from 'react-hot-toast';
+import { useSocket } from '../context/SocketContext';
 
 const CATEGORIES = ['all', 'delivery', 'academic', 'tech', 'household', 'tutoring', 'transport', 'events', 'personal', 'other'];
 const SORTS = [
@@ -18,6 +19,7 @@ export default function Browse() {
   const [total, setTotal] = useState(0);
   const [pages, setPages] = useState(1);
   const [loading, setLoading] = useState(true);
+  const socket = useSocket();
 
   const category = searchParams.get('category') || 'all';
   const sort = searchParams.get('sort') || 'newest';
@@ -47,6 +49,22 @@ export default function Browse() {
       .catch(() => toast.error('Failed to load tasks'))
       .finally(() => setLoading(false));
   }, [category, sort, search, page]);
+
+  // Real-time: remove tasks that have just been auto-deleted by the expiry job
+  useEffect(() => {
+    if (!socket) return;
+    const handleExpired = ({ expiredIds }) => {
+      const expiredSet = new Set(expiredIds.map(String));
+      setTasks(prev => prev.filter(t => !expiredSet.has(String(t._id))));
+      setTotal(prev => Math.max(0, prev - expiredIds.length));
+      toast('Some tasks expired and were automatically removed.', {
+        icon: '⏰',
+        style: { background: '#1a1a1a', color: '#ccc', border: '1px solid #333' },
+      });
+    };
+    socket.on('tasks:expired', handleExpired);
+    return () => socket.off('tasks:expired', handleExpired);
+  }, [socket]);
 
   return (
     <div className="pt-16 min-h-screen">

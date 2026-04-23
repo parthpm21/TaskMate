@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
+import { useSocket } from '../context/SocketContext';
 import toast from 'react-hot-toast';
 
 const STATUS_COLORS = {
@@ -16,6 +17,7 @@ const STATUS_LABELS = {
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const socket = useSocket();
   const [tab, setTab] = useState('posted');
   const [postedTasks, setPostedTasks] = useState([]);
   const [acceptedTasks, setAcceptedTasks] = useState([]);
@@ -31,6 +33,21 @@ export default function Dashboard() {
     }).catch(() => toast.error('Failed to load tasks'))
       .finally(() => setLoading(false));
   }, []);
+
+  // Real-time: remove tasks that have just been auto-deleted by the expiry job
+  useEffect(() => {
+    if (!socket) return;
+    const handleExpired = ({ expiredIds }) => {
+      const expiredSet = new Set(expiredIds.map(String));
+      setPostedTasks(prev => prev.filter(t => !expiredSet.has(String(t._id))));
+      setAcceptedTasks(prev => prev.filter(t => !expiredSet.has(String(t._id))));
+      toast('⏰ Some of your tasks expired and were automatically removed.', {
+        style: { background: '#1a1a1a', color: '#ccc', border: '1px solid #333' },
+      });
+    };
+    socket.on('tasks:expired', handleExpired);
+    return () => socket.off('tasks:expired', handleExpired);
+  }, [socket]);
 
   const tasks = tab === 'posted' ? postedTasks : acceptedTasks;
 
