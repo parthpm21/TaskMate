@@ -1,12 +1,9 @@
+import 'dotenv/config';  // Must be FIRST — loads .env before any other module's top-level code
 import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import mongoose from 'mongoose';
-
-// Ensure Clerk secret is set before any routes load
-dotenv.config();
 
 import authRoutes from './routes/auth.js';
 import taskRoutes from './routes/tasks.js';
@@ -33,7 +30,10 @@ app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173' }));
 app.use(express.json());
 
 import { clerkMiddleware } from '@clerk/express';
-app.use(clerkMiddleware());
+app.use(clerkMiddleware({
+  secretKey: process.env.CLERK_SECRET_KEY,
+  publishableKey: process.env.CLERK_PUBLISHABLE_KEY,
+}));
 
 // Attach io to req so routes can emit events
 app.use((req, _res, next) => {
@@ -56,8 +56,15 @@ app.get('/api/health', (_req, res) => res.json({ status: 'ok', time: new Date() 
 setupSocket(io);
 
 // MongoDB connection
+const mongoUri = process.env.MONGO_URI;
+const maskedUri = mongoUri?.replace(/:([^@]+)@/, ':***@') || 'NOT SET';
+console.log(`🔗 Connecting to MongoDB: ${maskedUri}`);
+
 mongoose
-  .connect(process.env.MONGO_URI)
+  .connect(mongoUri, {
+    serverSelectionTimeoutMS: 5000,  // fail fast if DB unreachable
+    socketTimeoutMS: 10000,
+  })
   .then(() => {
     console.log('✅ MongoDB connected');
     const PORT = process.env.PORT || 5000;
@@ -68,5 +75,7 @@ mongoose
   })
   .catch((err) => {
     console.error('❌ MongoDB connection error:', err.message);
+    console.error('   Check your MONGO_URI in server/.env');
+    console.error('   For deployed apps, use a MongoDB Atlas URI (mongodb+srv://...)');
     process.exit(1);
   });

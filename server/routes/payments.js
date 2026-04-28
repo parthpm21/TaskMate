@@ -7,14 +7,18 @@ import { protect } from '../middleware/auth.js';
 
 const router = express.Router();
 
+// Returns a Razorpay instance for real mode, or null for mock mode
+const MOCK_VALUES = new Set(['skip', 'your_key_id', 'your_key_secret', '']);
+
 const getRazorpay = () => {
-  if (!process.env.RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID === 'skip') {
-    throw new Error('Razorpay keys not configured');
+  const keyId = process.env.RAZORPAY_KEY_ID;
+  const keySecret = process.env.RAZORPAY_KEY_SECRET;
+
+  if (!keyId || !keySecret || MOCK_VALUES.has(keyId) || MOCK_VALUES.has(keySecret)) {
+    return null; // mock mode
   }
-  return new Razorpay({
-    key_id: process.env.RAZORPAY_KEY_ID,
-    key_secret: process.env.RAZORPAY_KEY_SECRET,
-  });
+
+  return new Razorpay({ key_id: keyId, key_secret: keySecret });
 };
 
 // POST /api/payments/create-order — poster pays into escrow
@@ -28,8 +32,15 @@ router.post('/create-order', protect, async (req, res) => {
     if (task.status !== 'assigned')
       return res.status(400).json({ message: 'Task must be assigned before payment' });
 
+    // Duplicate payment guard
+    if (task.paymentStatus === 'held' || task.paymentStatus === 'released') {
+      return res.status(400).json({ message: 'Payment already processed for this task' });
+    }
+
+    const razorpay = getRazorpay();
+
     // Mock payment flow bypass
-    if (process.env.RAZORPAY_KEY_ID === 'skip') {
+    if (!razorpay) {
       task.razorpayOrderId = 'mock_order_' + Date.now();
       task.paymentStatus = 'held';
       await task.save();
@@ -41,7 +52,8 @@ router.post('/create-order', protect, async (req, res) => {
       });
     }
 
-    const order = await getRazorpay().orders.create({
+    // Real Razorpay mode
+    const order = await razorpay.orders.create({
       amount: Math.round(task.finalAmount * 100), // paise
       currency: 'INR',
       receipt: `task_${taskId}`,
@@ -49,7 +61,7 @@ router.post('/create-order', protect, async (req, res) => {
     });
 
     task.razorpayOrderId = order.id;
-    task.paymentStatus = 'held';
+    // DO NOT set paymentStatus here — wait for /verify to confirm payment
     await task.save();
 
     res.json({
@@ -78,7 +90,11 @@ router.post('/verify', protect, async (req, res) => {
       return res.status(400).json({ message: 'Invalid payment signature' });
 
     const task = await Task.findById(taskId);
+    if (!task) return res.status(404).json({ message: 'Task not found' });
+
+    // Only set to held after verified signature
     task.paymentStatus = 'held';
+    task.razorpayPaymentId = razorpay_payment_id;
     await task.save();
 
     res.json({ verified: true });
@@ -118,3 +134,4 @@ router.post('/release', protect, async (req, res) => {
 });
 
 export default router;
+

@@ -21,21 +21,19 @@ const Spinner = () => (
 );
 
 // Guard for routes that need the user to be signed in.
-// Waits for BOTH Clerk's session AND the MongoDB profile sync to complete
-// before making any redirect decision — prevents false /login bounces.
+// Only waits for Clerk's session — the MongoDB profile loads in the background
+// so the page renders immediately after Clerk confirms sign-in.
 const PrivateRoute = ({ children }) => {
   const { isLoaded: clerkLoaded, isSignedIn } = useClerkAuth();
-  const { user, loading } = useAuth();
 
-  // Still initialising — show spinner, never redirect yet
-  if (!clerkLoaded || loading) return <Spinner />;
+  // Still initialising Clerk — show spinner, never redirect yet
+  if (!clerkLoaded) return <Spinner />;
 
   // Clerk says not signed in → send to login
   if (!isSignedIn) return <Navigate to="/login" replace />;
 
-  // Clerk says signed in but MongoDB sync failed (network error, etc.)
-  // Allow through — the page itself can handle a missing profile gracefully
-  return user ? children : <Spinner />;
+  // Clerk says signed in → render immediately (MongoDB profile loads in background)
+  return children;
 };
 
 const AppInner = () => {

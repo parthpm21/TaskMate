@@ -29,25 +29,32 @@ export default function TaskDetail() {
   const isAssigned = user && task?.assignedTo?._id === user._id;
   const myBid = bids.find(b => b.bidder?._id === user?._id);
 
+  // Fetch task data
   useEffect(() => {
-    Promise.all([
-      api.get(`/tasks/${id}`),
-      user 
-        ? api.get(`/bids/task/${id}`).catch((err) => {
-            // If 403, we are not the poster. Fetch just our own bid instead.
-            if (err.response?.status === 403) {
-              return api.get(`/bids/my/${id}`)
-                .then(res => ({ data: { bids: res.data.bid ? [res.data.bid] : [] } }))
-                .catch(() => ({ data: { bids: [] } }));
-            }
-            return { data: { bids: [] } };
-          })
-        : Promise.resolve(null),
-    ]).then(([taskRes, bidsRes]) => {
-      setTask(taskRes.data.task);
-      if (bidsRes) setBids(bidsRes.data.bids);
-    }).catch(() => toast.error('Task not found'))
+    setLoading(true);
+    api.get(`/tasks/${id}`)
+      .then(({ data }) => setTask(data.task))
+      .catch(() => toast.error('Task not found'))
       .finally(() => setLoading(false));
+  }, [id]);
+
+  // Fetch bids separately — re-runs when user loads
+  useEffect(() => {
+    if (!user) {
+      setBids([]);
+      return;
+    }
+    api.get(`/bids/task/${id}`)
+      .then(({ data }) => setBids(data.bids || []))
+      .catch((err) => {
+        // 403 = not the poster, try fetching own bid only
+        if (err.response?.status === 403) {
+          return api.get(`/bids/my/${id}`)
+            .then(({ data }) => setBids(data.bid ? [data.bid] : []))
+            .catch(() => setBids([]));
+        }
+        setBids([]);
+      });
   }, [id, user]);
 
   const placeBid = async (e) => {

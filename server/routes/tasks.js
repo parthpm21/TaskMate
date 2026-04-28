@@ -64,7 +64,31 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET /api/tasks/:id
+// GET /api/tasks/my/posted — must be BEFORE /:id to avoid "my" matching as an id
+router.get('/my/posted', protect, async (req, res) => {
+  try {
+    const tasks = await Task.find({ poster: req.user._id })
+      .sort({ createdAt: -1 })
+      .populate('assignedTo', 'name avatar rating');
+    res.json({ tasks });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// GET /api/tasks/my/accepted — must be BEFORE /:id
+router.get('/my/accepted', protect, async (req, res) => {
+  try {
+    const tasks = await Task.find({ assignedTo: req.user._id })
+      .sort({ createdAt: -1 })
+      .populate('poster', 'name avatar rating');
+    res.json({ tasks });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// GET /api/tasks/:id — only reached for real MongoDB ObjectIds now
 router.get('/:id', async (req, res) => {
   try {
     const task = await Task.findById(req.params.id)
@@ -181,30 +205,6 @@ router.put('/:id/dispute', protect, async (req, res) => {
     await task.save();
     req.io.to(`task:${task._id}`).emit('task:updated', { taskId: task._id, status: 'disputed' });
     res.json({ task });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
-
-// GET /api/tasks/my/posted
-router.get('/my/posted', protect, async (req, res) => {
-  try {
-    const tasks = await Task.find({ poster: req.user._id })
-      .sort({ createdAt: -1 })
-      .populate('assignedTo', 'name avatar rating');
-    res.json({ tasks });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
-
-// GET /api/tasks/my/accepted
-router.get('/my/accepted', protect, async (req, res) => {
-  try {
-    const tasks = await Task.find({ assignedTo: req.user._id })
-      .sort({ createdAt: -1 })
-      .populate('poster', 'name avatar rating');
-    res.json({ tasks });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

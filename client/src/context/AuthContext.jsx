@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useUser, useAuth as useClerkAuth } from '@clerk/clerk-react';
 import { setTokenGetter } from '../utils/tokenStore';
 import api from '../utils/api';
@@ -7,7 +7,7 @@ const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const { user: clerkUser, isLoaded: clerkLoaded } = useUser();
-  const { getToken } = useClerkAuth();
+  const { getToken, isSignedIn } = useClerkAuth();
 
   // MongoDB user profile
   const [user, setUser] = useState(null);
@@ -22,23 +22,46 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     if (!clerkLoaded) return;
 
-    if (!clerkUser) {
+    if (!clerkUser || !isSignedIn) {
       // Signed out
       setUser(null);
       setLoading(false);
       return;
     }
 
-    // Signed in — fetch (or lazy-create) the MongoDB profile
+    // Signed in — wait for a valid token before calling /auth/me
+    let cancelled = false;
     setLoading(true);
-    api.get('/auth/me')
-      .then(({ data }) => setUser(data.user))
-      .catch(() => setUser(null))
-      .finally(() => setLoading(false));
-  }, [clerkUser, clerkLoaded]);
+
+    const syncProfile = async () => {
+      try {
+        // Ensure we actually have a token before making the request
+        const token = await getToken();
+        if (!token || cancelled) {
+          if (!cancelled) {
+            setUser(null);
+            setLoading(false);
+          }
+          return;
+        }
+
+        const { data } = await api.get('/auth/me');
+        if (!cancelled) setUser(data.user);
+      } catch (err) {
+        console.error('Auth sync failed:', err.response?.status, err.message);
+        if (!cancelled) setUser(null);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    syncProfile();
+
+    return () => { cancelled = true; };
+  }, [clerkUser, clerkLoaded, isSignedIn, getToken]);
 
   // Allow components to update the cached MongoDB profile (e.g. after profile edit)
-  const updateUser = (updated) => setUser(updated);
+  const updateUser = useCallback((updated) => setUser(updated), []);
 
   return (
     <AuthContext.Provider value={{ user, loading, updateUser }}>
