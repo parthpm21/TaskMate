@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth as useClerkAuth, UserButton, SignInButton } from '@clerk/clerk-react';
 import { useAuth } from '../context/AuthContext';
 import { motion } from 'framer-motion';
+import { Shield } from 'lucide-react';
 
 export default function Navbar() {
   const { isSignedIn } = useClerkAuth();
@@ -28,6 +29,11 @@ export default function Navbar() {
           {isSignedIn && (
             <Link to="/dashboard" className={`text-sm font-medium transition-colors ${isActive('/dashboard') ? 'text-accent' : 'text-[#888] hover:text-white'}`}>
               Dashboard
+            </Link>
+          )}
+          {isSignedIn && user?.isAdmin && (
+            <Link to="/admin" className={`text-sm font-medium transition-colors flex items-center gap-1 ${isActive('/admin') ? 'text-accent' : 'text-[#888] hover:text-white'}`}>
+              <Shield className="w-3.5 h-3.5" /> Admin
             </Link>
           )}
         </div>
@@ -110,6 +116,9 @@ export default function Navbar() {
             <>
               <Link to="/post" className="text-sm text-[#ccc]" onClick={() => setMenuOpen(false)}>Post a Task</Link>
               <Link to="/dashboard" className="text-sm text-[#ccc]" onClick={() => setMenuOpen(false)}>Dashboard</Link>
+              {user?.isAdmin && (
+                <Link to="/admin" className="text-sm text-[#ccc] flex items-center gap-1" onClick={() => setMenuOpen(false)}><Shield className="w-3.5 h-3.5" /> Admin</Link>
+              )}
               {user && (
                 <Link to={`/profile/${user._id}`} className="text-sm text-[#ccc]" onClick={() => setMenuOpen(false)}>Profile</Link>
               )}

@@ -13,6 +13,7 @@ import PostTask from './pages/PostTask';
 import Dashboard from './pages/Dashboard';
 import Profile from './pages/Profile';
 import ChatPage from './pages/ChatPage';
+import AdminPage from './pages/AdminPage';
 
 const Spinner = () => (
   <div className="min-h-screen flex items-center justify-center">
@@ -59,6 +60,7 @@ const AppInner = () => {
         <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
         <Route path="/profile/:id" element={<Profile />} />
         <Route path="/chat/:taskId" element={<PrivateRoute><ChatPage /></PrivateRoute>} />
+        <Route path="/admin" element={<PrivateRoute><AdminPage /></PrivateRoute>} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </div>

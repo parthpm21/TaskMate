@@ -28,6 +28,7 @@ const userSchema = new mongoose.Schema(
     tasksDone: { type: Number, default: 0 },
     totalEarned: { type: Number, default: 0 },
     isVerified: { type: Boolean, default: false },
+    isAdmin: { type: Boolean, default: false },
     skills: [{ type: String }],
     badges: [{ type: String }],
   },

@@ -10,11 +10,13 @@ import { ClipboardList, CheckCircle2, Wallet, Award, Wrench, ChevronRight } from
 
 const STATUS_COLORS = {
   open: 'status-open', assigned: 'status-assigned', in_progress: 'status-in_progress',
-  completed: 'status-completed', disputed: 'status-disputed', cancelled: 'status-cancelled',
+  pending_review: 'status-pending_review', completed: 'status-completed',
+  disputed: 'status-disputed', cancelled: 'status-cancelled',
 };
 const STATUS_LABELS = {
   open: 'Open', assigned: 'Assigned', in_progress: 'In Progress',
-  completed: 'Completed', disputed: 'Disputed', cancelled: 'Cancelled',
+  pending_review: 'Pending Review', completed: 'Completed',
+  disputed: 'Disputed', cancelled: 'Cancelled',
 };
 
 export default function Dashboard() {
@@ -36,9 +38,20 @@ export default function Dashboard() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Real-time: remove tasks that have just been auto-deleted by the expiry job
+  // Real-time: listen for task status updates
   useEffect(() => {
     if (!socket) return;
+
+    const handleUpdated = ({ taskId, status, paymentStatus }) => {
+      const updater = (prev) => prev.map(t =>
+        String(t._id) === String(taskId)
+          ? { ...t, status, ...(paymentStatus ? { paymentStatus } : {}) }
+          : t
+      );
+      setPostedTasks(updater);
+      setAcceptedTasks(updater);
+    };
+
     const handleExpired = ({ expiredIds }) => {
       const expiredSet = new Set(expiredIds.map(String));
       setPostedTasks(prev => prev.filter(t => !expiredSet.has(String(t._id))));
@@ -47,9 +60,21 @@ export default function Dashboard() {
         style: { background: '#1a1a1a', color: '#ccc', border: '1px solid #333' },
       });
     };
+
+    socket.on('task:updated', handleUpdated);
     socket.on('tasks:expired', handleExpired);
-    return () => socket.off('tasks:expired', handleExpired);
+    return () => {
+      socket.off('task:updated', handleUpdated);
+      socket.off('tasks:expired', handleExpired);
+    };
   }, [socket]);
+
+  // Join task rooms so we receive updates
+  useEffect(() => {
+    if (!socket) return;
+    const allTasks = [...postedTasks, ...acceptedTasks];
+    allTasks.forEach(t => socket.emit('chat:join', t._id));
+  }, [socket, postedTasks, acceptedTasks]);
 
   const tasks = tab === 'posted' ? postedTasks : acceptedTasks;
 

@@ -12,6 +12,7 @@ import chatRoutes from './routes/chats.js';
 import paymentRoutes from './routes/payments.js';
 import reviewRoutes from './routes/reviews.js';
 import userRoutes from './routes/users.js';
+import adminRoutes from './routes/admin.js';
 import { setupSocket } from './socket.js';
 import { startTaskExpiryJob } from './jobs/taskExpiry.js';
 
@@ -49,6 +50,7 @@ app.use('/api/chats', chatRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/admin', adminRoutes);
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', time: new Date() }));
 

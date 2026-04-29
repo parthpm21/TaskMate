@@ -72,3 +72,14 @@ export const protect = async (req, res, next) => {
     return res.status(500).json({ message: 'Authentication failed' });
   }
 };
+
+/**
+ * requireAdmin — must be used AFTER protect.
+ * Rejects non-admin users with 403.
+ */
+export const requireAdmin = (req, res, next) => {
+  if (!req.user?.isAdmin) {
+    return res.status(403).json({ message: 'Admin access required' });
+  }
+  next();
+};

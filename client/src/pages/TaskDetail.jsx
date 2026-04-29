@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { formatDistanceToNow, format } from 'date-fns';
 import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
+import { useSocket } from '../context/SocketContext';
 import toast from 'react-hot-toast';
 import PayButton from '../components/PayButton';
 import ReleaseButton from '../components/ReleaseButton';
@@ -11,12 +12,14 @@ import { Wallet, MapPin, Clock, MessageCircle, CalendarDays, Lock, Rocket, Check
 
 const STATUS_LABELS = {
   open: 'Open', assigned: 'Assigned', in_progress: 'In Progress',
-  completed: 'Completed', disputed: 'Disputed', cancelled: 'Cancelled',
+  pending_review: 'Pending Review', completed: 'Completed',
+  disputed: 'Disputed', cancelled: 'Cancelled',
 };
 
 export default function TaskDetail() {
   const { id } = useParams();
   const { user } = useAuth();
+  const socket = useSocket();
   const navigate = useNavigate();
   const [task, setTask] = useState(null);
   const [bids, setBids] = useState([]);
@@ -37,6 +40,19 @@ export default function TaskDetail() {
       .catch(() => toast.error('Task not found'))
       .finally(() => setLoading(false));
   }, [id]);
+
+  // Real-time socket: join task room and listen for updates
+  useEffect(() => {
+    if (!socket || !id) return;
+    socket.emit('chat:join', id);
+    const handleUpdate = ({ taskId, status, paymentStatus }) => {
+      if (String(taskId) === id) {
+        setTask(t => t ? { ...t, status, ...(paymentStatus ? { paymentStatus } : {}) } : t);
+      }
+    };
+    socket.on('task:updated', handleUpdate);
+    return () => socket.off('task:updated', handleUpdate);
+  }, [socket, id]);
 
   // Fetch bids separately — re-runs when user loads
   useEffect(() => {
@@ -85,13 +101,23 @@ export default function TaskDetail() {
     }
   };
 
-  const markComplete = async () => {
+  const submitWork = async () => {
     try {
-      const { data } = await api.put(`/tasks/${id}/complete`);
+      const { data } = await api.put(`/tasks/${id}/submit`);
       setTask(data.task);
-      toast.success('Task marked as complete!');
+      toast.success('Work submitted for review!');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed');
+      toast.error(err.response?.data?.message || 'Failed to submit');
+    }
+  };
+
+  const approveWork = async () => {
+    try {
+      const { data } = await api.put(`/tasks/${id}/approve`);
+      setTask(data.task);
+      toast.success('Work approved! Payment released.');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to approve');
     }
   };
 
@@ -277,10 +303,28 @@ export default function TaskDetail() {
               </button>
             )}
 
-            {/* Mark complete */}
-            {(isPoster || isAssigned) && task.status === 'in_progress' && (
-              <button onClick={markComplete} className="w-full bg-green-500 text-white font-bold py-4 rounded-xl hover:bg-green-600 transition-colors flex items-center justify-center gap-2">
-                <CheckCircle2 className="w-5 h-5" /> Mark as Complete
+            {/* Tasker submits work for review */}
+            {isAssigned && task.status === 'in_progress' && (
+              <button onClick={submitWork} className="w-full bg-amber-500 text-black font-bold py-4 rounded-xl hover:bg-amber-400 transition-colors flex items-center justify-center gap-2">
+                <CheckCircle2 className="w-5 h-5" /> Submit Work for Review
+              </button>
+            )}
+
+            {/* Pending review state */}
+            {task.status === 'pending_review' && (
+              <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-amber-500/10 border border-amber-500/25 rounded-2xl p-4 flex items-center gap-3">
+                <Clock className="w-8 h-8 text-amber-400" />
+                <div>
+                  <div className="text-sm font-bold text-amber-400">Work submitted — awaiting poster review</div>
+                  <div className="text-xs text-[#666] mt-0.5">{isPoster ? 'Review the work and approve to release payment.' : 'The poster will review your submission shortly.'}</div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Poster approves work */}
+            {isPoster && task.status === 'pending_review' && (
+              <button onClick={approveWork} className="w-full bg-green-500 text-white font-bold py-4 rounded-xl hover:bg-green-600 transition-colors flex items-center justify-center gap-2">
+                <CheckCircle2 className="w-5 h-5" /> Approve &amp; Release Payment
               </button>
             )}
 
@@ -303,7 +347,7 @@ export default function TaskDetail() {
               </motion.div>
             )}
 
-            {(isPoster || isAssigned) && ['assigned', 'in_progress'].includes(task.status) && (
+            {(isPoster || isAssigned) && ['assigned', 'in_progress', 'pending_review'].includes(task.status) && (
               <Link to={`/chat/${task._id}`} className="w-full flex items-center justify-center gap-2 border border-[#222] hover:border-accent text-[#ccc] hover:text-accent font-medium py-4 rounded-xl transition-all">
                 <MessageSquare className="w-5 h-5" /> Open Chat
               </Link>

@@ -13,7 +13,7 @@ const taskSchema = new mongoose.Schema(
     budget: { type: Number, required: true, min: 10 },
     status: {
       type: String,
-      enum: ['open', 'assigned', 'in_progress', 'completed', 'disputed', 'cancelled'],
+      enum: ['open', 'assigned', 'in_progress', 'pending_review', 'completed', 'disputed', 'cancelled'],
       default: 'open',
     },
     poster: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },

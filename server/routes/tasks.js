@@ -13,7 +13,7 @@ router.get('/', async (req, res) => {
     const {
       category, status = 'open', minBudget, maxBudget,
       search, sort = 'newest', page = 1, limit = 12,
-      lat, lng, radius = 20, // radius in km
+      lat, lng, radius = 20,
     } = req.query;
 
     const filter = { status };
@@ -30,7 +30,6 @@ router.get('/', async (req, res) => {
       ];
     }
 
-    // Geo filter
     if (lat && lng) {
       filter['location.coordinates'] = {
         $near: {
@@ -64,7 +63,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET /api/tasks/my/posted — must be BEFORE /:id to avoid "my" matching as an id
+// GET /api/tasks/my/posted — must be BEFORE /:id
 router.get('/my/posted', protect, async (req, res) => {
   try {
     const tasks = await Task.find({ poster: req.user._id })
@@ -88,7 +87,7 @@ router.get('/my/accepted', protect, async (req, res) => {
   }
 });
 
-// GET /api/tasks/:id — only reached for real MongoDB ObjectIds now
+// GET /api/tasks/:id
 router.get('/:id', async (req, res) => {
   try {
     const task = await Task.findById(req.params.id)
@@ -119,7 +118,6 @@ router.post(
     try {
       const task = await Task.create({ ...req.body, poster: req.user._id });
       await task.populate('poster', 'name avatar rating totalReviews');
-      // Increment poster's tasksPosted count
       req.user.tasksPosted += 1;
       await req.user.save();
       res.status(201).json({ task });
@@ -155,7 +153,7 @@ router.delete('/:id', protect, async (req, res) => {
     if (!task) return res.status(404).json({ message: 'Task not found' });
     if (task.poster.toString() !== req.user._id.toString())
       return res.status(403).json({ message: 'Not authorised' });
-    if (['assigned', 'in_progress'].includes(task.status))
+    if (['assigned', 'in_progress', 'pending_review'].includes(task.status))
       return res.status(400).json({ message: 'Cannot delete an active task' });
 
     task.status = 'cancelled';
@@ -166,7 +164,70 @@ router.delete('/:id', protect, async (req, res) => {
   }
 });
 
-// PUT /api/tasks/:id/complete — mark as complete (tasker or poster)
+// PUT /api/tasks/:id/submit — TASKER marks work as done → pending_review
+router.put('/:id/submit', protect, async (req, res) => {
+  try {
+    const task = await Task.findById(req.params.id);
+    if (!task) return res.status(404).json({ message: 'Task not found' });
+    if (task.assignedTo?.toString() !== req.user._id.toString())
+      return res.status(403).json({ message: 'Only the assigned tasker can submit work' });
+    if (task.status !== 'in_progress')
+      return res.status(400).json({ message: 'Task must be in progress to submit' });
+
+    task.status = 'pending_review';
+    await task.save();
+
+    req.io.to(`task:${task._id}`).emit('task:updated', {
+      taskId: task._id,
+      status: 'pending_review',
+    });
+
+    res.json({ task });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// PUT /api/tasks/:id/approve — POSTER approves work → completed + triggers payment release
+router.put('/:id/approve', protect, async (req, res) => {
+  try {
+    const task = await Task.findById(req.params.id);
+    if (!task) return res.status(404).json({ message: 'Task not found' });
+    if (task.poster.toString() !== req.user._id.toString())
+      return res.status(403).json({ message: 'Only the poster can approve work' });
+    if (task.status !== 'pending_review')
+      return res.status(400).json({ message: 'Task must be in pending_review state' });
+
+    task.status = 'completed';
+    task.completedAt = new Date();
+
+    // Auto-release escrow if payment was held
+    if (task.paymentStatus === 'held') {
+      task.paymentStatus = 'released';
+      if (task.assignedTo) {
+        const User = (await import('../models/User.js')).default;
+        await User.findByIdAndUpdate(task.assignedTo, {
+          $inc: { totalEarned: task.finalAmount, tasksDone: 1 },
+        });
+      }
+    }
+
+    await task.save();
+
+    req.io.to(`task:${task._id}`).emit('task:updated', {
+      taskId: task._id,
+      status: 'completed',
+      paymentStatus: task.paymentStatus,
+    });
+    req.io.to(`task:${task._id}`).emit('payment:released', { taskId: task._id });
+
+    res.json({ task });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// PUT /api/tasks/:id/complete — legacy endpoint (kept for backwards compat)
 router.put('/:id/complete', protect, async (req, res) => {
   try {
     const task = await Task.findById(req.params.id);
@@ -175,16 +236,14 @@ router.put('/:id/complete', protect, async (req, res) => {
       task.poster.toString() === req.user._id.toString() ||
       task.assignedTo?.toString() === req.user._id.toString();
     if (!isInvolved) return res.status(403).json({ message: 'Not authorised' });
-    if (task.status !== 'in_progress')
+    if (!['in_progress', 'pending_review'].includes(task.status))
       return res.status(400).json({ message: 'Task must be in progress to complete' });
 
     task.status = 'completed';
     task.completedAt = new Date();
     await task.save();
 
-    // Notify via socket
     req.io.to(`task:${task._id}`).emit('task:updated', { taskId: task._id, status: 'completed' });
-
     res.json({ task });
   } catch (err) {
     res.status(500).json({ message: err.message });
