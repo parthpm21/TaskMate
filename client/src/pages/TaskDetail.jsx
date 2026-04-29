@@ -45,13 +45,36 @@ export default function TaskDetail() {
   useEffect(() => {
     if (!socket || !id) return;
     socket.emit('chat:join', id);
-    const handleUpdate = ({ taskId, status, paymentStatus }) => {
-      if (String(taskId) === id) {
-        setTask(t => t ? { ...t, status, ...(paymentStatus ? { paymentStatus } : {}) } : t);
+    const handleUpdate = (data) => {
+      if (String(data.taskId) === id) {
+        setTask(t => {
+          if (!t) return t;
+          const updated = { ...t, status: data.status };
+          if (data.paymentStatus) updated.paymentStatus = data.paymentStatus;
+          if (data.assignedTo) updated.assignedTo = data.assignedTo;
+          if (data.finalAmount) updated.finalAmount = data.finalAmount;
+          return updated;
+        });
       }
     };
+    
+    const handleNewBid = ({ bid }) => {
+      if (String(bid.task) === id || (bid.task && String(bid.task._id) === id)) {
+        setBids(prev => {
+          if (prev.some(b => b._id === bid._id)) return prev;
+          setTask(t => t ? { ...t, bidsCount: t.bidsCount + 1 } : t);
+          return [bid, ...prev];
+        });
+      }
+    };
+
     socket.on('task:updated', handleUpdate);
-    return () => socket.off('task:updated', handleUpdate);
+    socket.on('bid:new', handleNewBid);
+    
+    return () => {
+      socket.off('task:updated', handleUpdate);
+      socket.off('bid:new', handleNewBid);
+    };
   }, [socket, id]);
 
   // Fetch bids separately — re-runs when user loads
@@ -264,7 +287,7 @@ export default function TaskDetail() {
               )}
             </AnimatePresence>
 
-            {myBid && (
+            {myBid && task.status === 'open' && (
               <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-green-500/10 border border-green-500/25 rounded-2xl p-5">
                 <div className="flex items-center gap-2 text-green-400 font-bold mb-1"><CheckCircle2 className="w-5 h-5" /> Your bid is placed</div>
                 <p className="text-[#888] text-sm">You bid ₹{myBid.amount} — waiting for poster to respond.</p>
@@ -272,7 +295,7 @@ export default function TaskDetail() {
             )}
 
             {/* Poster pays into escrow after assigning a bid */}
-            {isPoster && task.status === 'assigned' && task.paymentStatus === 'unpaid' && (
+            {isPoster && ['assigned', 'in_progress', 'pending_review'].includes(task.status) && task.paymentStatus === 'unpaid' && (
               <PayButton
                 task={task}
                 onPaid={(updatedTask) => setTask(updatedTask)}
@@ -280,7 +303,7 @@ export default function TaskDetail() {
             )}
 
             {/* Escrow held — inform poster payment is locked in */}
-            {isPoster && task.status === 'assigned' && task.paymentStatus === 'held' && (
+            {isPoster && ['assigned', 'in_progress', 'pending_review'].includes(task.status) && task.paymentStatus === 'held' && (
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-green-500/10 border border-green-500/25 rounded-2xl p-4 flex items-center gap-3">
                 <Lock className="w-8 h-8 text-green-400" />
                 <div>

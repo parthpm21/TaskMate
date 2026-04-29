@@ -107,7 +107,7 @@ router.put('/:id/accept', protect, async (req, res) => {
 
     // Notify via socket
     req.io.to(`task:${task._id}`).emit('task:updated', {
-      taskId: task._id, status: 'assigned', assignedTo: bid.bidder,
+      taskId: task._id, status: 'assigned', assignedTo: bid.bidder, finalAmount: bid.amount
     });
 
     res.json({ bid, task });

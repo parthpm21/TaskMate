@@ -42,12 +42,15 @@ export default function Dashboard() {
   useEffect(() => {
     if (!socket) return;
 
-    const handleUpdated = ({ taskId, status, paymentStatus }) => {
-      const updater = (prev) => prev.map(t =>
-        String(t._id) === String(taskId)
-          ? { ...t, status, ...(paymentStatus ? { paymentStatus } : {}) }
-          : t
-      );
+    const handleUpdated = (data) => {
+      const updater = (prev) => prev.map(t => {
+        if (String(t._id) !== String(data.taskId)) return t;
+        const updated = { ...t, status: data.status };
+        if (data.paymentStatus) updated.paymentStatus = data.paymentStatus;
+        if (data.assignedTo) updated.assignedTo = data.assignedTo;
+        if (data.finalAmount) updated.finalAmount = data.finalAmount;
+        return updated;
+      });
       setPostedTasks(updater);
       setAcceptedTasks(updater);
     };
@@ -61,11 +64,21 @@ export default function Dashboard() {
       });
     };
 
+    const handleNewBid = ({ bid }) => {
+      setPostedTasks(prev => prev.map(t => 
+        String(t._id) === String(bid.task) || String(t._id) === String(bid.task?._id)
+          ? { ...t, bidsCount: (t.bidsCount || 0) + 1 }
+          : t
+      ));
+    };
+
     socket.on('task:updated', handleUpdated);
     socket.on('tasks:expired', handleExpired);
+    socket.on('bid:new', handleNewBid);
     return () => {
       socket.off('task:updated', handleUpdated);
       socket.off('tasks:expired', handleExpired);
+      socket.off('bid:new', handleNewBid);
     };
   }, [socket]);
 
@@ -76,7 +89,9 @@ export default function Dashboard() {
     allTasks.forEach(t => socket.emit('chat:join', t._id));
   }, [socket, postedTasks, acceptedTasks]);
 
-  const tasks = tab === 'posted' ? postedTasks : acceptedTasks;
+  const activePostedTasks = postedTasks.filter(t => t.status !== 'completed' && t.status !== 'cancelled');
+  const activeAcceptedTasks = acceptedTasks.filter(t => t.status !== 'completed' && t.status !== 'cancelled');
+  const tasks = tab === 'posted' ? activePostedTasks : activeAcceptedTasks;
 
   return (
     <div className="pt-16 min-h-screen">
@@ -113,7 +128,7 @@ export default function Dashboard() {
 
         {/* Tabs */}
         <div className="flex gap-2 mb-6">
-          {[['posted', `Tasks I Posted (${postedTasks.length})`], ['accepted', `Tasks I'm Doing (${acceptedTasks.length})`]].map(([val, label]) => (
+          {[['posted', `Tasks I Posted (${activePostedTasks.length})`], ['accepted', `Tasks I'm Doing (${activeAcceptedTasks.length})`]].map(([val, label]) => (
             <button
               key={val}
               onClick={() => setTab(val)}
